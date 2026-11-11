@@ -17,6 +17,9 @@ from ai.agilery.app.validation.validator.transaction_accounts_different_validato
 from ai.agilery.app.validation.validator.transaction_amount_validator import (
     TransactionAmountValidator,
 )
+from ai.agilery.app.validation.validator.transaction_sufficient_balance_validator import (
+    TransactionSufficientBalanceValidator,
+)
 
 
 class TransactionUpdateValidationChain(AbstractValidationChain[TransactionUpdateDto]):
@@ -41,3 +44,4 @@ class TransactionUpdateValidationChain(AbstractValidationChain[TransactionUpdate
         self.add(TransactionAccountsExistValidator(account_repository))
         self.add(TransactionAccountsDifferentValidator())
         self.add(TransactionAmountValidator())
+        self.add(TransactionSufficientBalanceValidator(account_repository))

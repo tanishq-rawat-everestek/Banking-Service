@@ -20,7 +20,11 @@ class Settings(BaseSettings):
         "Example python service",
     )
     PORT: int = int(os.getenv("AGILERY_PORT_NUMBER", "8080"))
-    CORS_ALLOW_ORIGINS: list[str] = ["*"]
+    CORS_ALLOW_ORIGINS: list[str] = [
+        origin.strip()
+        for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000").split(",")
+        if origin.strip()
+    ]
 
     DATABASE_TYPE: str = os.getenv("AGILERY_DATABASE_TYPE", "sqlite")
     DATABASE_USERNAME: str = os.getenv("AGILERY_DATABASE_USERNAME", "")

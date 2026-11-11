@@ -3,7 +3,7 @@ Transaction database model.
 """
 
 # pyright: reportIncompatibleVariableOverride=false
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import ClassVar, Optional, TYPE_CHECKING
 
@@ -65,16 +65,16 @@ class Transaction(SQLModel, table=True):
 
     # Audit fields
     created_date_time: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column("created_date_time", DateTime, nullable=False),
     )
     last_modified_date_time: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(
             "last_modified_date_time",
             DateTime,
             nullable=False,
-            onupdate=datetime.utcnow,
+            onupdate=lambda: datetime.now(timezone.utc),
         ),
     )
     created_by: Optional[str] = Field(default=None)

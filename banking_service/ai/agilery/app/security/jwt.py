@@ -32,12 +32,24 @@ def build_rsa_public_key(jwk: dict) -> RSAPublicKey:
     return jwt.algorithms.RSAAlgorithm.from_jwk(jwk)  # type: ignore
 
 
+# Reusable HTTP client to avoid resource leaks
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    """Get or create singleton HTTP client for JWKS fetching."""
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=3.0)
+    return _http_client
+
+
 async def _fetch_jwks():
     logger.info("Fetching JWKS from %s", settings.JWKS_URL)
-    async with httpx.AsyncClient() as client:
-        response = await client.get(settings.JWKS_URL, timeout=3.0)
-        response.raise_for_status()
-        return response.json()
+    client = get_http_client()
+    response = await client.get(settings.JWKS_URL)
+    response.raise_for_status()
+    return response.json()
 
 
 def _validate_required_claims(payload: dict):
@@ -180,13 +192,23 @@ async def get_current_user(
 
     TEST MODE:
     Authentication is bypassed only when TESTING_MODE is explicitly set to 'true'.
-    Never use ENV=test in production - use a dedicated TESTING_MODE flag.
+    This mode should NEVER be enabled in production environments.
     """
 
     # Bypass authentication ONLY during automated testing with explicit flag
-    # This should NEVER be enabled in production deployments
+    # Critical security check: ensure this is never accidentally enabled in production
     testing_mode = os.getenv("TESTING_MODE", "false").lower() == "true"
+    env = os.getenv("ENV", "production").lower()
+
     if testing_mode:
+        # Additional safety check: block testing mode in production environment
+        if env == "production" or env == "prod":
+            logger.critical(
+                "TESTING_MODE is enabled in production environment - this is a security violation!"
+            )
+            raise AuthenticationException(
+                "Authentication bypass is not allowed in production"
+            )
         logger.warning("TESTING_MODE is enabled - authentication is bypassed")
         return {}
 
@@ -206,7 +228,17 @@ def require_permission(permission: str):
 
     async def _check(user_payload: dict = Depends(get_current_user)):
         testing_mode = os.getenv("TESTING_MODE", "false").lower() == "true"
+        env = os.getenv("ENV", "production").lower()
+
         if testing_mode:
+            # Additional safety check: block testing mode in production
+            if env == "production" or env == "prod":
+                logger.critical(
+                    "TESTING_MODE is enabled in production environment - this is a security violation!"
+                )
+                raise AuthorizationException(
+                    "Authorization bypass is not allowed in production"
+                )
             return
 
         security_validation_service.validate_permission(user_payload, permission)

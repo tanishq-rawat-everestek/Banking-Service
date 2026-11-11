@@ -144,15 +144,15 @@ class TransactionServiceImpl(TransactionService):
         self, from_account_id: int, to_account_id: int, amount: Decimal
     ) -> None:
         """
-        Update account balances after a transaction.
+        Update account balances after a transaction with row-level locking.
 
         Args:
             from_account_id: Source account ID
             to_account_id: Destination account ID
             amount: Transaction amount
         """
-        from_account = self.account_repo.get_by_id(from_account_id)
-        to_account = self.account_repo.get_by_id(to_account_id)
+        from_account = self.account_repo.get_by_id_for_update(from_account_id)
+        to_account = self.account_repo.get_by_id_for_update(to_account_id)
 
         if from_account:
             from_account.balance -= amount
@@ -168,15 +168,15 @@ class TransactionServiceImpl(TransactionService):
         self, from_account_id: int, to_account_id: int, amount: Decimal
     ) -> None:
         """
-        Reverse account balances (used when updating/deleting transactions).
+        Reverse account balances with row-level locking (used when updating/deleting transactions).
 
         Args:
             from_account_id: Source account ID
             to_account_id: Destination account ID
             amount: Transaction amount
         """
-        from_account = self.account_repo.get_by_id(from_account_id)
-        to_account = self.account_repo.get_by_id(to_account_id)
+        from_account = self.account_repo.get_by_id_for_update(from_account_id)
+        to_account = self.account_repo.get_by_id_for_update(to_account_id)
 
         if from_account:
             from_account.balance += amount

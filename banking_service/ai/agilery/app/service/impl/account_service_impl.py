@@ -25,6 +25,9 @@ from ai.agilery.app.repositories.account_repository import AccountRepository
 from ai.agilery.app.security.jwt import get_current_user
 from ai.agilery.app.service.account_service import AccountService
 from ai.agilery.app.util.audit import apply_created_audit, apply_modified_audit
+from ai.agilery.app.validation.service.account_validation_service import (
+    AccountValidationService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +41,11 @@ class AccountServiceImpl(AccountService):
         self,
         account_repo: AccountRepository = Depends(),
         user: dict = Depends(get_current_user),
+        validation_service: AccountValidationService = Depends(),
     ):
         self.account_repo = account_repo
         self.current_user = user
+        self.validation_service = validation_service
 
     # -----------------------------------------------
     # Helpers
@@ -103,26 +108,8 @@ class AccountServiceImpl(AccountService):
         """
         logger.info("Creating account with account number: %s", dto.account_number)
 
-        # Check uniqueness constraints
-        existing_by_account_number = self.account_repo.get_by_account_number(
-            dto.account_number
-        )
-        if existing_by_account_number and not existing_by_account_number.is_deleted:
-            raise ValidationException(
-                description=f"Account with account number '{dto.account_number}' already exists."
-            )
-
-        existing_by_email = self.account_repo.get_by_email(dto.email)
-        if existing_by_email and not existing_by_email.is_deleted:
-            raise ValidationException(
-                description=f"Account with email '{dto.email}' already exists."
-            )
-
-        existing_by_phone = self.account_repo.get_by_phone_number(dto.phone_number)
-        if existing_by_phone and not existing_by_phone.is_deleted:
-            raise ValidationException(
-                description=f"Account with phone number '{dto.phone_number}' already exists."
-            )
+        # Delegate validation to validation service
+        self.validation_service.on_create(dto)
 
         entity = account_mapper.to_entity(dto)
         apply_created_audit(entity, self.current_user)
@@ -189,35 +176,15 @@ class AccountServiceImpl(AccountService):
             Updated account DTO
         """
         logger.info("Updating account with ID: %s", account_id)
+
+        # Set the ID for validation
+        dto.id = account_id
+
+        # Delegate validation to validation service
+        self.validation_service.on_update(dto)
+
+        # Get existing entity (already validated to exist)
         existing = self.account_repo.get_by_id(account_id)
-        if not existing or existing.is_deleted:
-            raise ResourceNotFoundException(
-                f"Account with ID '{account_id}' not found."
-            )
-
-        # Check uniqueness constraints if fields are being changed
-        if dto.account_number != existing.account_number:
-            existing_by_account_number = self.account_repo.get_by_account_number(
-                dto.account_number
-            )
-            if existing_by_account_number and not existing_by_account_number.is_deleted:
-                raise ValidationException(
-                    description=f"Account with account number '{dto.account_number}' already exists."
-                )
-
-        if dto.email != existing.email:
-            existing_by_email = self.account_repo.get_by_email(dto.email)
-            if existing_by_email and not existing_by_email.is_deleted:
-                raise ValidationException(
-                    description=f"Account with email '{dto.email}' already exists."
-                )
-
-        if dto.phone_number != existing.phone_number:
-            existing_by_phone = self.account_repo.get_by_phone_number(dto.phone_number)
-            if existing_by_phone and not existing_by_phone.is_deleted:
-                raise ValidationException(
-                    description=f"Account with phone number '{dto.phone_number}' already exists."
-                )
 
         account_mapper.update(existing, dto)
         apply_modified_audit(existing, self.current_user)
@@ -237,38 +204,15 @@ class AccountServiceImpl(AccountService):
             Patched account DTO
         """
         logger.info("Patching account with ID: %s", account_id)
+
+        # Set the ID for validation
+        dto.id = account_id
+
+        # Delegate validation to validation service
+        self.validation_service.on_patch(dto)
+
+        # Get existing entity (already validated to exist)
         existing = self.account_repo.get_by_id(account_id)
-        if not existing or existing.is_deleted:
-            raise ResourceNotFoundException(
-                f"Account with ID '{account_id}' not found."
-            )
-
-        # Check uniqueness constraints for fields being changed
-        if (
-            dto.account_number is not None
-            and dto.account_number != existing.account_number
-        ):
-            existing_by_account_number = self.account_repo.get_by_account_number(
-                dto.account_number
-            )
-            if existing_by_account_number and not existing_by_account_number.is_deleted:
-                raise ValidationException(
-                    description=f"Account with account number '{dto.account_number}' already exists."
-                )
-
-        if dto.email is not None and dto.email != existing.email:
-            existing_by_email = self.account_repo.get_by_email(dto.email)
-            if existing_by_email and not existing_by_email.is_deleted:
-                raise ValidationException(
-                    description=f"Account with email '{dto.email}' already exists."
-                )
-
-        if dto.phone_number is not None and dto.phone_number != existing.phone_number:
-            existing_by_phone = self.account_repo.get_by_phone_number(dto.phone_number)
-            if existing_by_phone and not existing_by_phone.is_deleted:
-                raise ValidationException(
-                    description=f"Account with phone number '{dto.phone_number}' already exists."
-                )
 
         account_mapper.patch(existing, dto)
         apply_modified_audit(existing, self.current_user)

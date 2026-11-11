@@ -45,6 +45,11 @@ class AccountRepository:
         """Fetch by primary key — fastest lookup."""
         return self.db.get(Account, id)
 
+    def get_by_id_for_update(self, id: int) -> Optional[Account]:
+        """Fetch by primary key with row-level lock (SELECT FOR UPDATE) to prevent race conditions."""
+        stmt = select(Account).where(col(Account.id) == id).with_for_update()
+        return self.db.exec(stmt).first()
+
     def get_by_account_number(self, account_number: str) -> Optional[Account]:
         """Fetch by unique account number."""
         stmt = select(Account).where(
